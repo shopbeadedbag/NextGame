@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS based on original index.html styles */
+
+/* Player footer styles */
+.player__footer {
+  @apply bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-primary/10 px-6 py-4;
+}
+
+.player-footer__inner {
+  @apply flex items-center justify-between;
+}
+
+.player-footer__item {
+  @apply flex items-center gap-4;
+}
+
+.player-footer__left {
+  @apply flex items-center gap-3;
+}
+
+.player-footer__left h1 {
+  @apply text-xl font-bold text-gray-900 dark:text-white;
+}
+
+.player-footer__actions {
+  @apply flex items-center gap-3;
+}
+
+.g-footer__button {
+  @apply flex flex-col items-center justify-center px-3 py-2 rounded-lg bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors;
+}
+
+.g-footer__button-title {
+  @apply text-xs text-center text-gray-600 dark:text-gray-400;
+}
+
+.g-footer__button:hover .g-footer__button-title {
+  @apply text-primary;
+}
+
+.g-footer__button:hover .svg-icon {
+  @apply text-primary;
+}
+
+/* Button styles */
+.btn_up {
+  @apply fixed bottom-8 right-8 z-50 w-12 h-12 rounded-full bg-primary text-white shadow-lg hover:bg-primary-hover transition-all duration-300 flex items-center justify-center;
+}
+
+/* Form styles */
+.input_search {
+  @apply bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-primary focus:ring-primary;
+}
+
+/* Card styles */
+.thumb-card {
+  @apply no-underline;
+}
+
+.thumb-card:hover {
+  @apply text-primary-hover;
+}
+
+.title-game {
+  @apply block;
+}
+
+/* Loading styles */
+.page_loading {
+  @apply fixed inset-0 bg-black/50 z-50 flex items-center justify-center;
+}
+
+.loading_page {
+  @apply flex items-center justify-center;
+}
+
+.loader {
+  @apply w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin;
+}
+
+/* Description styles */
+.game-description {
+  @apply max-w-none text-base leading-relaxed text-gray-700 dark:text-gray-300;
+}
+
+.game-description h2 {
+  @apply text-2xl font-bold text-gray-900 dark:text-white mt-6 mb-3;
+}
+
+.game-description h3 {
+  @apply text-xl font-semibold text-gray-900 dark:text-white mt-4 mb-2;
+}
+
+.game-description p {
+  @apply mb-3;
+}
+
+.game-description ul {
+  @apply list-disc list-inside mb-3 space-y-1;
+}
+
+.game-description li {
+  @apply text-gray-700 dark:text-gray-300;
+}
+
+/* Lazy loading styles */
+.lazy {
+  @apply opacity-0 transition-opacity duration-300;
+}
+
+.lazy.loaded {
+  @apply opacity-100;
+}
+
+/* Frame box styles */
+.frame-box-game {
+  @apply w-full h-full rounded-lg overflow-hidden;
+}
+
+.frame-box-game iframe {
+  @apply w-full h-full border-0;
+}
+
+/* Utility classes */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Focus states */
+.focus-visible:focus {
+  @apply outline-none ring-2 ring-primary ring-offset-2;
+}
+
+/* Dark mode transitions */
+.dark {
+  color-scheme: dark;
+}
+
+/* Print styles */
+@media print {
+  .player__footer,
+  .player-footer__actions,
+  .btn_up {
+    display: none;
+  }
+}
+
+/* Animation utilities */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
