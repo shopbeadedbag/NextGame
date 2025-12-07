@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/generate-sitemap.js && next dev",
+    "build": "node scripts/generate-sitemap.js && next build",
     "start": "next start",
     "lint": "next lint",
-    "export": "next build && next export"
+    "export": "node scripts/generate-sitemap.js && next build && next export",
+    "sitemap": "node scripts/generate-sitemap.js"
   },
   "dependencies": {
     "next": "14.2.5",

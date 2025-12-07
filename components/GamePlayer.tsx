@@ -1,13 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { GamePlayerProps } from '@/types';
 import Link from 'next/link';
+import Image from 'next/image';
+import { GAME_CONFIG, SITE_CONFIG } from '@/config/site';
+import RatingDisplay from './RatingDisplay';
 
 export default function GamePlayer({ game, featured = false }: GamePlayerProps) {
   const [isClient, setIsClient] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Use featured game config if this is the featured game
+  const gameData = featured && GAME_CONFIG.iframe.src ? {
+    ...game,
+    title: GAME_CONFIG.title,
+    url: GAME_CONFIG.iframe.src,
+    thumb: GAME_CONFIG.ogImage
+  } : game;
 
   const handleFullscreen = () => {
     if (!isClient) return;
@@ -32,23 +44,23 @@ export default function GamePlayer({ game, featured = false }: GamePlayerProps) 
                 className="relative w-full h-[--mobile-height] md:h-[--desktop-height]"
                 style={{
                   width: '100%',
-                  '--mobile-height': '400px',
-                  '--desktop-height': '550px',
-                  minHeight: '520px'
+                  '--mobile-height': SITE_CONFIG.ui.gamePlayer.mobileHeight,
+                  '--desktop-height': SITE_CONFIG.ui.gamePlayer.desktopHeight,
+                  minHeight: SITE_CONFIG.ui.gamePlayer.minHeight
                 } as React.CSSProperties}
               >
                 <div className="frame-box-game">
                   <iframe
                     id="game-area"
                     allowFullScreen={true}
-                    title={`Play ${game.title}`}
+                    title={`Play ${gameData.title}`}
                     width="100%"
                     height="100%"
-                    src={game.url}
-                    allow="autoplay; fullscreen; camera; focus-without-user-activation *; monetization; gamepad; keyboard-map *; xr-spatial-tracking; clipboard-write; web-share; accelerometer; magnetometer; gyroscope; display-capture"
+                    src={gameData.url}
+                    allow={GAME_CONFIG.iframe.allow}
                     name="gameFrame"
                     scrolling="no"
-                    sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-scripts allow-same-origin allow-downloads"
+                    sandbox={GAME_CONFIG.iframe.sandbox}
                     className="border-0 rounded-2xl"
                   />
                 </div>
@@ -57,17 +69,33 @@ export default function GamePlayer({ game, featured = false }: GamePlayerProps) 
 
             <div className="player__footer player-footer">
               <div className="player-footer__inner">
-                <div className="player-footer__left player-footer__item">
-                  <img
-                    width="40"
-                    height="40"
-                    src={game.thumb}
-                    className="img-fluid rounded-lg"
-                    decoding="async"
-                    alt={`Play ${game.title} now!`}
-                    fetchPriority="high"
-                  />
-                  <h1 className="ml-3">{game.title}</h1>
+                <div className="player-footer__left player-footer__item flex items-center flex-wrap gap-3">
+                  <div className="relative w-10 h-10 rounded-lg overflow-hidden">
+                    {!imageLoaded && (
+                      <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                    )}
+                    <Image
+                      src={gameData.thumb}
+                      alt={`Play ${gameData.title} now!`}
+                      fill
+                      sizes="40px"
+                      className={`rounded-lg object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                      priority={featured} // Load featured game image with high priority
+                      onLoad={() => setImageLoaded(true)}
+                    />
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                    <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">{gameData.title}</h1>
+                    {/* Rating Display */}
+                    <div className="rating-wrapper">
+                      <RatingDisplay
+                        score={GAME_CONFIG.rating.value}
+                        votes={GAME_CONFIG.rating.count}
+                        maxScore={GAME_CONFIG.rating.max}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="player-footer__actions player-footer__item">

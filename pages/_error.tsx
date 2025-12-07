@@ -1,12 +1,29 @@
 import { NextPageContext } from 'next';
 import Head from 'next/head';
 import { SITE_NAME } from '@/config/site';
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 interface ErrorProps {
   statusCode?: number;
 }
 
 export default function Error({ statusCode }: ErrorProps) {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Client-side redirect for 404 errors
+    if (statusCode === 404 && typeof window !== 'undefined') {
+      router.replace('/404');
+    }
+  }, [statusCode, router]);
+
+  // Don't render anything for 404 errors (will redirect)
+  if (statusCode === 404) {
+    return null;
+  }
+
+  // Render default error page for other error codes
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
       <Head>
@@ -32,7 +49,20 @@ export default function Error({ statusCode }: ErrorProps) {
   );
 }
 
-Error.getInitialProps = ({ res, err }: NextPageContext) => {
+Error.getInitialProps = ({ res, err, asPath }: NextPageContext) => {
   const statusCode = res ? res.statusCode : err ? err.statusCode : 404;
+
+  // Handle 404 errors with redirect
+  if (statusCode === 404 && res) {
+    // Server-side redirect with 302 status
+    res.writeHead(302, {
+      Location: '/404',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+    });
+    res.end();
+  }
+
   return { statusCode };
 };

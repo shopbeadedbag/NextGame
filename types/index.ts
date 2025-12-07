@@ -39,3 +39,18 @@ export interface SearchResultsProps {
   games: Game[];
   searchTerm: string;
 }
+
+export interface CategoryPageProps {
+  games: Game[];
+  categoryName: string;
+  allCategories: string[];
+  allGames: Game[];
+}
+
+export interface TagPageProps {
+  games: Game[];
+  tagName: string;
+  allTags: string[];
+  relatedTags: string[];
+  allGames: Game[];
+}

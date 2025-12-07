@@ -1,30 +1,60 @@
 import Head from 'next/head';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LayoutProps } from '@/types';
 import Header from './Header';
-import { SITE_URL, SITE_NAME } from '@/config/site';
+import Footer from './Footer';
+import Analytics from './Analytics';
+import { SITE_URL, SITE_NAME, SITE_CONFIG, DEFAULT_DESCRIPTION, DEFAULT_KEYWORDS } from '@/config/site';
+import { useSearch } from '@/contexts/SearchContext';
+import { getPopularTags } from '@/utils/gameUtils';
 
 interface ExtendedLayoutProps extends LayoutProps {
   onSearch?: (searchTerm: string) => void;
+  games?: any[];
 }
 
 export default function Layout({
   children,
   title = SITE_NAME,
-  description = 'Slope Rider is an adrenaline-packed endless runner game where speed, balance, and reflexes push every run to the limit. Let\'s ride the digital winter now!',
-  image = '/cache/data/image/game/slope-rider/sloperider-m186x186.webp',
+  description = DEFAULT_DESCRIPTION,
+  image = '/resources/images/favicon.png',
   type = 'website',
   url = SITE_URL,
   canonical = SITE_URL,
-  onSearch
+  onSearch,
+  games
 }: ExtendedLayoutProps) {
+  const { searchTerm, games: contextGames, handleSearch: contextHandleSearch } = useSearch();
+  const [popularTags, setPopularTags] = useState<Array<{ name: string; href: string; count: number }>>([]);
+
+  // Use provided games if available, otherwise use context games
+  const gamesToUse = games || contextGames;
+
+  // Handle search - use context handleSearch if available, otherwise use provided onSearch
+  const handleSearch = (term: string) => {
+    if (contextHandleSearch) {
+      contextHandleSearch(term);
+    }
+    if (onSearch) {
+      onSearch(term);
+    }
+  };
+
+  // Fetch popular tags on the client side
+  useEffect(() => {
+    if (gamesToUse && gamesToUse.length > 0) {
+      const tags = getPopularTags(gamesToUse, 5);
+      setPopularTags(tags);
+    }
+  }, [gamesToUse]);
+
   return (
     <>
       <Head>
         <meta charSet="utf-8" />
         <title>{title}</title>
         <meta name="description" content={description} />
-        <meta name="keywords" content="slope rider, games, endless runner, skiing, snow games" />
+        <meta name="keywords" content={DEFAULT_KEYWORDS} />
         <meta name="title" content={title} />
         <meta property="fb:app_id" content="" />
         <meta property="og:title" content={title} />
@@ -40,16 +70,20 @@ export default function Layout({
         <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
         <meta name="HandheldFriendly" content="true" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="shortcut icon" sizes="512x512" href="/cache/data/image/options/favicon-s512x512.png" />
-        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/cache/data/image/options/favicon-s512x512.png" />
+        <link rel="shortcut icon" sizes="512x512" href="/resources/images/favicon.png" />
+        <link rel="icon" type="image/png" href="/resources/images/favicon.png" />
+        <link rel="apple-touch-icon" href="/resources/images/favicon.png" />
         <meta httpEquiv="x-ua-compatible" content="ie=edge" />
         <link rel="canonical" href={canonical} data-react-helmet="true" />
         <link rel="stylesheet" type="text/css" href="/resources/css/style.min.css" />
+
+        {/* Google Site Verification */}
+        <meta name="google-site-verification" content="qCzFYFIlJnw-7xERAvhH2-HfrZlbCurntq4YhojjF0g" />
       </Head>
 
       <div className="min-h-screen dark:bg-gray-950 font-sans antialiased flex flex-col">
-        <Header onSearch={onSearch} />
+        <Analytics />
+        <Header onSearch={handleSearch} games={gamesToUse} />
 
         <div className="relative flex-1">
           <div className="max-w-7xl mx-auto">
@@ -78,11 +112,7 @@ export default function Layout({
           </div>
         </div>
 
-        <footer className="mt-auto bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 py-4">
-          <div className="max-w-7xl mx-auto flex">
-            <div className="flex justify-center items-center gap-4 flex-wrap px-3 md:px-12 w-full"></div>
-          </div>
-        </footer>
+        <Footer popularTags={popularTags} />
       </div>
 
       <div className="page_loading" style={{ display: 'none' }}>

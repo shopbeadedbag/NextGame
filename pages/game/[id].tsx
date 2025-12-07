@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import fs from 'fs';
@@ -9,6 +9,7 @@ import GameGrid from '@/components/GameGrid';
 import GameDescription from '@/components/GameDescription';
 import { Game } from '@/types';
 import { SITE_NAME, SITE_URL, MAX_RELATED_GAMES } from '@/config/site';
+import { useSearch } from '@/contexts/SearchContext';
 
 interface GamePageProps {
   game: Game | null;
@@ -16,31 +17,12 @@ interface GamePageProps {
 }
 
 export default function GamePage({ game, allGames }: GamePageProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filteredGames, setFilteredGames] = useState(allGames);
+  const { setGames } = useSearch();
 
-  // Use searchTerm to avoid unused variable warning
-  React.useEffect(() => {
-    // This effect runs when searchTerm changes, keeping it "used"
-  }, [searchTerm]);
-
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-
-    if (!term.trim()) {
-      setFilteredGames(allGames);
-      return;
-    }
-
-    const filtered = allGames.filter(g =>
-      g.title.toLowerCase().includes(term.toLowerCase()) ||
-      g.description.toLowerCase().includes(term.toLowerCase()) ||
-      g.category.toLowerCase().includes(term.toLowerCase()) ||
-      g.tags.toLowerCase().includes(term.toLowerCase())
-    );
-
-    setFilteredGames(filtered);
-  };
+  // Set games in context when component mounts
+  useEffect(() => {
+    setGames(allGames);
+  }, [allGames, setGames]);
 
   if (!game) {
     return (
@@ -48,7 +30,6 @@ export default function GamePage({ game, allGames }: GamePageProps) {
         title="Game Not Found"
         description="The requested game was not found."
         type="website"
-        onSearch={handleSearch}
       >
         <div className="w-full mx-auto px-3 md:px-10 py-3 md:py-6">
           <div className="text-center py-16">
@@ -71,23 +52,153 @@ export default function GamePage({ game, allGames }: GamePageProps) {
   }
 
   // Remove current game from grid and limit to 4 rows (32 games max)
-  const relatedGames = filteredGames.filter(g => g.id !== game.id).slice(0, MAX_RELATED_GAMES);
+  const relatedGames = allGames.filter(g => g.id !== game.id).slice(0, MAX_RELATED_GAMES);
 
-  // JSON-LD structured data for the game
-  const gameStructuredData = {
+  // Get popular games (excluding current game) - top 32 games by simple criteria
+  // Use a stable sorting algorithm to avoid hydration errors
+  const popularGames = allGames
+    .filter(g => g.id !== game.id)
+    .sort((a, b) => {
+      // Sort by title length first, then by title alphabetically for stable sorting
+      const lengthDiff = (100 - a.title.length) - (100 - b.title.length);
+      if (lengthDiff !== 0) return lengthDiff;
+      return a.title.localeCompare(b.title);
+    })
+    .slice(0, 32); // 4 rows × 8 games per row
+
+  // Generate breadcrumb list
+  const breadcrumbList = {
     "@context": "https://schema.org",
-    "@type": "VideoGame",
-    "name": game.title,
-    "description": game.description,
-    "image": game.thumb,
-    "url": `${SITE_URL}/game/${game.id}`,
-    "genre": game.category,
-    "keywords": game.tags,
-    "publisher": {
-      "@type": "Organization",
-      "name": SITE_NAME,
-      "url": SITE_URL
-    }
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": SITE_NAME,
+        "item": SITE_URL
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Games",
+        "item": `${SITE_URL}/game`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": game.title,
+        "item": `${SITE_URL}/game/${game.id}`
+      }
+    ]
+  };
+
+  // Generate complete structured data
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      // Website Schema
+      {
+        "@type": "WebSite",
+        "name": SITE_NAME,
+        "url": SITE_URL,
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": `${SITE_URL}/search?q={search_term_string}`
+          },
+          "query-input": "required name=search_term_string"
+        }
+      },
+      // Organization Schema
+      {
+        "@type": "Organization",
+        "name": SITE_NAME,
+        "url": SITE_URL,
+        "logo": {
+          "@type": "ImageObject",
+          "url": `${SITE_URL}/favicon.png`,
+          "width": 512,
+          "height": 512
+        },
+        "sameAs": [
+          "https://www.roblox.com/games/127742093697776/Plants-Vs-Brainrots"
+        ]
+      },
+      // WebPage Schema
+      {
+        "@type": "WebPage",
+        "name": `${game.title} - ${SITE_NAME}`,
+        "description": game.description,
+        "url": `${SITE_URL}/game/${game.id}`,
+        "mainEntity": {
+          "@type": "VideoGame",
+          "name": game.title,
+          "description": game.description,
+          "image": game.thumb,
+          "url": `${SITE_URL}/game/${game.id}`,
+          "genre": game.category,
+          "keywords": game.tags,
+          "applicationCategory": "Game",
+          "operatingSystem": "Web Browser",
+          "playMode": "SinglePlayer",
+          "publisher": {
+            "@type": "Organization",
+            "name": SITE_NAME,
+            "url": SITE_URL
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.2",
+            "ratingCount": "500",
+            "bestRating": "5",
+            "worstRating": "1"
+          }
+        }
+      },
+      // VideoGame Schema
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": game.title,
+        "description": game.description,
+        "image": {
+          "@type": "ImageObject",
+          "url": game.thumb,
+          "width": 512,
+          "height": 384
+        },
+        "url": `${SITE_URL}/game/${game.id}`,
+        "genre": game.category,
+        "keywords": game.tags,
+        "applicationCategory": "Game",
+        "operatingSystem": "Web Browser",
+        "playMode": "SinglePlayer",
+        "publisher": {
+          "@type": "Organization",
+          "name": SITE_NAME,
+          "url": SITE_URL,
+          "logo": {
+            "@type": "ImageObject",
+            "url": `${SITE_URL}/favicon.png`,
+            "width": 512,
+            "height": 512
+          }
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "4.2",
+          "ratingCount": "500",
+          "bestRating": "5",
+          "worstRating": "1"
+        },
+        "datePublished": "2024-01-01T00:00:00.000Z", // Fixed date to avoid hydration error
+        "inLanguage": "en-US",
+        "isAccessibleForFree": true
+      },
+      // BreadcrumbList Schema
+      breadcrumbList
+    ]
   };
 
   return (
@@ -96,7 +207,7 @@ export default function GamePage({ game, allGames }: GamePageProps) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(gameStructuredData),
+            __html: JSON.stringify(structuredData),
           }}
         />
       </Head>
@@ -107,7 +218,6 @@ export default function GamePage({ game, allGames }: GamePageProps) {
         type="website"
         url={`${SITE_URL}/game/${game.id}`}
         canonical={`${SITE_URL}/game/${game.id}`}
-        onSearch={handleSearch}
       >
       <div id="sub-page-data" className="w-full mx-auto px-3 md:px-10 py-3 md:py-6 page-data">
         {/* Game Player Section */}
@@ -125,6 +235,16 @@ export default function GamePage({ game, allGames }: GamePageProps) {
 
         {/* Game Description Section */}
         <GameDescription game={game} featured={false} />
+
+        {/* Popular Games Section */}
+        {popularGames.length > 0 && (
+          <>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
+              Popular Games
+            </h2>
+            <GameGrid games={popularGames} featured={false} />
+          </>
+        )}
       </div>
       </Layout>
     </>

@@ -1,38 +1,42 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
-import fs from 'fs';
-import path from 'path';
+import Head from 'next/head';
 import Layout from '@/components/Layout';
 import GamePlayer from '@/components/GamePlayer';
 import GameGrid from '@/components/GameGrid';
 import GameDescription from '@/components/GameDescription';
 import { Game } from '@/types';
-import { SITE_NAME, SITE_URL } from '@/config/site';
+import { SITE_NAME, SITE_URL, SITE_CONFIG, GAME_CONFIG } from '@/config/site';
+import { useSearch } from '@/contexts/SearchContext';
+import { loadAllGames } from '@/utils/gameData';
 
 interface HomePageProps {
-  allGames: Game[];
+  // Only pass minimal data needed for the homepage
   featuredGame: Game;
+  gridGames: Game[]; // Only 32 games for the grid
+  totalGames: number;
 }
 
-export default function HomePage({ allGames, featuredGame }: HomePageProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filteredGames, setFilteredGames] = useState(allGames || []);
+export default function HomePage({ featuredGame, gridGames, totalGames }: HomePageProps) {
+  const { setGames } = useSearch();
 
-  // Use searchTerm in dependency to avoid unused variable warning
+  // Set games in context when component mounts
   React.useEffect(() => {
-    // This effect runs when searchTerm changes, keeping it "used"
-  }, [searchTerm]);
+    // For search context, we might need all games, but let's load them on demand
+    // For now, we'll set the grid games which should be sufficient for search
+    setGames(gridGames);
+  }, [gridGames, setGames]);
 
   // Handle cases where data might be missing
-  if (!allGames || allGames.length === 0 || !featuredGame) {
+  if (!gridGames || gridGames.length === 0 || !featuredGame) {
     return (
       <Layout
-        title="Slope Rider"
-        description="Slope Rider is an adrenaline-packed endless runner game where speed, balance, and reflexes push every run to the limit. Let's ride the digital winter now!"
-        image="/cache/data/image/game/slope-rider/sloperider-m186x186.webp"
+        title={SITE_NAME}
+        description={GAME_CONFIG.description}
+        image={GAME_CONFIG.ogImage}
         type="website"
-        url="https://sloperidergame.github.io"
-        canonical="https://sloperidergame.github.io"
+        url={SITE_URL}
+        canonical={SITE_URL}
       >
         <div className="w-full mx-auto px-3 md:px-10 py-3 md:py-6 text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Loading Games...</h1>
@@ -42,79 +46,135 @@ export default function HomePage({ allGames, featuredGame }: HomePageProps) {
     );
   }
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-
-    if (!term.trim()) {
-      setFilteredGames(allGames);
-      return;
-    }
-
-    const filtered = allGames.filter(game =>
-      game.title.toLowerCase().includes(term.toLowerCase()) ||
-      game.description.toLowerCase().includes(term.toLowerCase()) ||
-      game.category.toLowerCase().includes(term.toLowerCase()) ||
-      game.tags.toLowerCase().includes(term.toLowerCase())
-    );
-
-    setFilteredGames(filtered);
+  // Generate structured data for homepage
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      // Website Schema
+      {
+        "@type": "WebSite",
+        "name": SITE_NAME,
+        "url": SITE_URL,
+        "description": GAME_CONFIG.description,
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": `${SITE_URL}/search?q={search_term_string}`
+          },
+          "query-input": "required name=search_term_string"
+        }
+      },
+      // Organization Schema
+      {
+        "@type": "Organization",
+        "name": SITE_NAME,
+        "url": SITE_URL,
+        "logo": {
+          "@type": "ImageObject",
+          "url": `${SITE_URL}/favicon.png`,
+          "width": 512,
+          "height": 512
+        },
+        "description": GAME_CONFIG.description,
+        "sameAs": [
+          "https://www.roblox.com/games/127742093697776/Plants-Vs-Brainrots"
+        ]
+      },
+      // WebPage Schema for Homepage
+      {
+        "@type": "WebPage",
+        "name": SITE_NAME,
+        "description": GAME_CONFIG.description,
+        "url": SITE_URL,
+        "mainEntity": {
+          "@type": "ItemList",
+          "name": "Free Online Games",
+          "description": "Discover and play the best free online games",
+          "url": SITE_URL,
+          "numberOfItems": gridGames.length,
+          "itemListElement": gridGames.slice(0, 10).map((game, index) => ({
+            "@type": "ListItem",
+            "position": index + 1,
+            "item": {
+              "@type": "VideoGame",
+              "name": game.title,
+              "description": game.description,
+              "image": game.thumb,
+              "url": `${SITE_URL}/game/${game.id}`,
+              "genre": game.category,
+              "keywords": game.tags,
+              "applicationCategory": "Game",
+              "operatingSystem": "Web Browser",
+              "playMode": "SinglePlayer"
+            }
+          }))
+        }
+      }
+    ]
   };
 
-  // Remove featured game from grid and limit to 4 rows (32 games max)
-  const gridGames = useMemo(() => {
-    const otherGames = filteredGames.filter(game => game.id !== featuredGame.id);
-    // Limit to 32 games (4 rows × 8 columns max for large screens)
-    return otherGames.slice(0, 32);
-  }, [filteredGames, featuredGame.id]);
-
   return (
-    <Layout
-      title={SITE_NAME}
-      description="Slope Rider is an adrenaline-packed endless runner game where speed, balance, and reflexes push every run to the limit. Let's ride the digital winter now!"
-      image="/cache/data/image/game/slope-rider/sloperider-m186x186.webp"
-      type="website"
-      url={SITE_URL}
-      canonical={SITE_URL}
-      onSearch={handleSearch}
-    >
-      <div id="sub-page-data" className="w-full mx-auto px-3 md:px-10 py-3 md:py-6 page-data">
-        {/* Featured Game Section */}
-        <GamePlayer game={featuredGame} featured={true} />
+    <>
+      <Head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(structuredData),
+          }}
+        />
+      </Head>
+      <Layout
+        title={GAME_CONFIG.title}
+        description={GAME_CONFIG.description}
+        image={GAME_CONFIG.ogImage}
+        type="website"
+        url={SITE_URL}
+        canonical={SITE_URL}
+        games={gridGames}
+      >
+        <div id="sub-page-data" className="w-full mx-auto px-3 md:px-10 py-3 md:py-6 page-data">
+          {/* Featured Game Section */}
+          <GamePlayer game={featuredGame} featured={true} />
 
-        {/* Games Grid Section */}
-        <GameGrid games={gridGames} featured={false} />
+          {/* Games Grid Section */}
+          <GameGrid games={gridGames} featured={false} />
 
-        {/* Game Description Section */}
-        <GameDescription game={featuredGame} featured={true} />
-      </div>
-    </Layout>
+          {/* Game Description Section */}
+          <GameDescription game={featuredGame} featured={true} />
+        </div>
+      </Layout>
+    </>
   );
 }
 
 export const getServerSideProps: GetServerSideProps<HomePageProps> = async () => {
   try {
-    // Read feed.json file
-    const feedPath = path.join(process.cwd(), 'feed.json');
-    const fileContents = fs.readFileSync(feedPath, 'utf8');
-
-    // Parse JSON - it's an array directly, not wrapped in an object
-    const games: Game[] = JSON.parse(fileContents);
+    // Load all games
+    const allGames = await loadAllGames();
 
     // Get first game as featured game
-    const featuredGame = games[0];
+    const featuredGame = allGames[0];
+
+    // Get 32 games for the grid (excluding featured game)
+    const gridGames = allGames
+      .filter(game => game.id !== featuredGame.id)
+      .slice(0, 32);
 
     return {
       props: {
-        allGames: games,
-        featuredGame: featuredGame,
+        featuredGame,
+        gridGames,
+        totalGames: allGames.length,
       },
     };
   } catch (error) {
-    console.error('Error reading games data:', error);
+    console.error('Error loading home page data:', error);
     return {
       props: {
-        allGames: [],
         featuredGame: null as any,
+        gridGames: [],
+        totalGames: 0,
       },
     };
   }
