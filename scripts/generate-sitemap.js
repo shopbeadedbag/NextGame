@@ -5,9 +5,11 @@ const path = require('path');
 const feedPath = path.join(process.cwd(), 'feed.json');
 const feedData = JSON.parse(fs.readFileSync(feedPath, 'utf8'));
 
-// 基础 URL - 请根据实际情况修改
-const BASE_URL = 'https://your-domain.com'; // 替换为你的实际域名
-
+// 从项目配置中读取域名
+const configPath = path.join(process.cwd(), 'config', 'site.ts');
+const configContent = fs.readFileSync(configPath, 'utf8');
+const siteUrlMatch = configContent.match(/SITE_URL\s*[=:]\s*['"]([^'"]+)['"]/);
+const BASE_URL = (siteUrlMatch ? siteUrlMatch[1] : 'https://your-domain.com').replace(/\/+$/, '');
 // 生成 sitemap.xml
 function generateSitemap() {
   const games = feedData;
