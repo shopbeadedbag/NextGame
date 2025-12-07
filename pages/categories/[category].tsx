@@ -289,7 +289,7 @@ export default function CategoryPage({ games, categoryName, allCategories, total
           </div>
 
           {/* Games Grid */}
-          <GameGrid games={currentGames} featured={false} />
+          <GameGrid games={currentGames as Game[]} featured={false} />
 
           {/* Pagination */}
           {totalPages > 1 && (

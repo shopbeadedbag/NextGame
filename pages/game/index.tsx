@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import Head from 'next/head';
 import Layout from '@/components/Layout';
 import GameGrid from '@/components/GameGrid';
@@ -8,7 +9,7 @@ import Pagination from '@/components/Pagination';
 import { Game } from '@/types';
 import { SITE_NAME, SITE_URL, GAME_CONFIG } from '@/config/site';
 import { useSearch } from '@/contexts/SearchContext';
-import { searchGames } from '@/utils/gameData';
+import { searchGames, loadAllGames } from '@/utils/gameData';
 import { PAGINATION_CONFIG } from '@/config/pagination';
 
 // Minimal game data for the list
@@ -192,7 +193,7 @@ export default function AllGamesPage({ games, totalGames, currentPage, hasSearch
           </div>
 
           {/* Games Grid */}
-          <GameGrid games={currentGames} featured={false} />
+          <GameGrid games={currentGames as Game[]} featured={false} />
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -242,7 +243,19 @@ export const getServerSideProps: GetServerSideProps<AllGamesPageProps> = async (
     const offset = (page - 1) * PAGINATION_CONFIG.PAGE_SIZE;
 
     // Load only the games for current page
-    const { games, total } = await searchGames(searchQuery, PAGINATION_CONFIG.PAGE_SIZE, offset);
+    let games: Game[], total: number;
+
+    if (searchQuery.trim()) {
+      // If there's a search query, use searchGames
+      const result = await searchGames(searchQuery, PAGINATION_CONFIG.PAGE_SIZE, offset);
+      games = result.games;
+      total = result.total;
+    } else {
+      // If no search query, load all games (for the /game page listing)
+      const allGames = await loadAllGames();
+      total = allGames.length;
+      games = allGames.slice(offset, offset + PAGINATION_CONFIG.PAGE_SIZE);
+    }
 
     // Transform to minimal game data
     const minimalGames: MinimalGame[] = games.map(game => ({

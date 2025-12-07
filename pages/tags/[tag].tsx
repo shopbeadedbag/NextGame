@@ -39,47 +39,36 @@ export default function TagPage({ games, tagName, allTags, relatedTags, totalGam
   const { searchTerm } = useSearch();
   const [filteredGames, setFilteredGames] = useState(games || []);
 
-  // Get current page from query params, default to 1
-  const currentPage = useMemo(() => {
-    const page = parseInt(router.query.page as string);
-    return isNaN(page) || page < 1 ? 1 : page;
-  }, [router.query.page]);
+  // Use the current page from props (server-side calculated)
+  const currentPageFromProps = currentPage;
 
   // Filter games based on search term
   useEffect(() => {
-    if (!searchTerm.trim()) {
+    if (!hasSearch) {
       setFilteredGames(games);
       return;
     }
 
-    const filtered = games.filter(game =>
-      game.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      game.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      game.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // If there's a search term from server, redirect to search page
+    if (searchTerm.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchTerm)}`, undefined, { shallow: true });
+    }
+  }, [searchTerm, games, hasSearch]);
 
-    setFilteredGames(filtered);
-  }, [searchTerm, games]);
-
-  // Calculate pagination
+  // Calculate pagination - now we use the total from props
   const totalPages = useMemo(() => {
-    return Math.ceil(filteredGames.length / PAGINATION_CONFIG.PAGE_SIZE);
-  }, [filteredGames.length]);
+    return Math.ceil(totalGamesWithTag / PAGINATION_CONFIG.PAGE_SIZE);
+  }, [totalGamesWithTag]);
 
-  // Get games for current page
-  const currentGames = useMemo(() => {
-    const startIndex = (currentPage - 1) * PAGINATION_CONFIG.PAGE_SIZE;
-    const endIndex = startIndex + PAGINATION_CONFIG.PAGE_SIZE;
-    return filteredGames.slice(startIndex, endIndex);
-  }, [filteredGames, currentPage]);
+  // Current games are already filtered server-side
+  const currentGames = filteredGames;
 
   // Reset to page 1 when search changes
   useEffect(() => {
-    if (searchTerm.trim() && currentPage !== 1) {
-      const tagSlug = tagName.toLowerCase().replace(/\s+/g, '-');
-      router.push(`/tags/${tagSlug}?page=1`, undefined, { shallow: true });
+    if (searchTerm.trim() && !hasSearch && currentPageFromProps !== 1) {
+      router.push(`/search?q=${encodeURIComponent(searchTerm)}`, undefined, { shallow: true });
     }
-  }, [searchTerm]);
+  }, [searchTerm, hasSearch, currentPageFromProps]);
 
   // Handle loading state
   if (router.isFallback) {
@@ -267,14 +256,15 @@ export default function TagPage({ games, tagName, allTags, relatedTags, totalGam
             {tagName} Games
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto mb-6">
-            Explore {filteredGames.length} amazing games tagged with "{tagName}". From popular favorites
+            Explore {totalGamesWithTag} amazing games tagged with "{tagName}". From popular favorites
             to hidden gems, discover games that match your interests perfectly.
           </p>
 
           {/* Games Count Info */}
           <div className="inline-flex items-center px-4 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
             <span className="text-green-600 dark:text-green-400 font-medium">
-              Showing {currentGames.length} of {filteredGames.length} {tagName.toLowerCase()} games
+              Showing {games.length} of {totalGamesWithTag} {tagName.toLowerCase()} games
+              {hasSearch && ` for "${searchQuery}"`}
             </span>
           </div>
         </div>
@@ -316,41 +306,37 @@ export default function TagPage({ games, tagName, allTags, relatedTags, totalGam
         </div>
 
         {/* Games Grid */}
-        <GameGrid games={currentGames} featured={false} />
+        <GameGrid games={currentGames as Game[]} featured={false} />
 
         {/* Pagination */}
         {totalPages > 1 && (
           <Pagination
-            currentPage={currentPage}
+            currentPage={currentPageFromProps}
             totalPages={totalPages}
             baseUrl={`/tags/${encodeURIComponent(tagName.toLowerCase().replace(/\s+/g, '-'))}`}
-            queryParams={searchTerm.trim() ? { search: searchTerm } : {}}
+            queryParams={hasSearch ? { search: searchQuery } : {}}
           />
         )}
 
         {/* No Games Found */}
-        {filteredGames.length === 0 && (
+        {games.length === 0 && (
           <div className="mt-12 text-center">
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
               No Games Found
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {searchTerm.trim()
-                ? `No ${tagName.toLowerCase()} games found for "${searchTerm}". Try adjusting your search terms.`
+              {hasSearch
+                ? `No ${tagName.toLowerCase()} games found for your search. Try adjusting your search terms.`
                 : `No games found with the ${tagName.toLowerCase()} tag.`
               }
             </p>
-            {searchTerm.trim() && (
-              <button
-                onClick={() => {
-                  // Clear search
-                  const tagSlug = tagName.toLowerCase().replace(/\s+/g, '-');
-                  router.push(`/tags/${tagSlug}?page=1`, undefined, { shallow: true });
-                }}
+            {hasSearch && (
+              <Link
+                href={`/tags/${encodeURIComponent(tagName.toLowerCase().replace(/\s+/g, '-'))}?page=1`}
                 className="inline-flex items-center px-6 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary-hover transition-colors duration-200"
               >
                 Show All {tagName} Games
-              </button>
+              </Link>
             )}
           </div>
         )}
@@ -521,7 +507,7 @@ function getCategoryIcon(categoryName: string): string {
 }
 
 // Helper function to get popular categories for a tag
-function getPopularCategoriesForTag(games: Game[]): string[] {
+function getPopularCategoriesForTag(games: MinimalGame[]): string[] {
   const categoryCount: Record<string, number> = {};
 
   games.forEach(game => {
@@ -541,6 +527,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const tagParam = context.params?.tag;
     const tagName = Array.isArray(tagParam) ? tagParam[0] : tagParam;
     const page = parseInt(context.query.page as string) || 1;
+    const searchQuery = context.query.search as string || '';
 
     if (!tagName) {
       return { notFound: true };
@@ -549,9 +536,12 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     // Decode the tag name from URL
     const decodedTagName = decodeURIComponent(tagName).replace(/-/g, ' ');
 
+    // Calculate offset
+    const offset = (page - 1) * PAGINATION_CONFIG.PAGE_SIZE;
+
     // Use optimized data loading
     const allTags = await getAllTags();
-    const { games, total } = await loadGamesByTag(decodedTagName);
+    const { games, total } = await loadGamesByTag(decodedTagName, PAGINATION_CONFIG.PAGE_SIZE, offset);
 
     // If no games found for this tag, return 404
     if (total === 0) {
@@ -562,9 +552,23 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
           allTags,
           relatedTags: [],
           totalGamesWithTag: 0,
+          currentPage: page,
+          hasSearch: !!searchQuery,
+          searchQuery,
         },
       };
     }
+
+    // Transform to minimal game data
+    const minimalGames: MinimalGame[] = games.map(game => ({
+      id: game.id,
+      title: game.title,
+      description: game.description,
+      thumb: game.thumb,
+      category: game.category,
+      tags: game.tags,
+      url: game.url,
+    }));
 
     // Get related tags (simplified - in a real app, you'd have a more sophisticated algorithm)
     const relatedTags = allTags
@@ -573,11 +577,14 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
     return {
       props: {
-        games,
+        games: minimalGames,
         tagName: decodedTagName,
         allTags,
         relatedTags,
         totalGamesWithTag: total,
+        currentPage: page,
+        hasSearch: !!searchQuery,
+        searchQuery,
       },
     };
   } catch (error) {
@@ -589,6 +596,9 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         allTags: [],
         relatedTags: [],
         totalGamesWithTag: 0,
+        currentPage: 1,
+        hasSearch: false,
+        searchQuery: '',
       },
     };
   }
